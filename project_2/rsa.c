@@ -19,29 +19,33 @@ llint p, q, e, d, n;
 #define getQuotient(x) (x >> 32)
 #define getRemainder(x) (x & 0xffffffff)
 #define getDividedbyTwo(x) (x >> 1)
-#define isODD(x) ((x & 0x01) == 0x01)
+#define isODD(x) (x & 1)
+
+#define RND_SIZE (RND_MAX - RND_MIN)
 
 llint division(llint x, llint n){
-    llint remainder = x;
-    llint quotient = 0;
+    llint r = x; // remainder
+    llint q = 0; // quotient
     llint result;
 
-    if(remainder < 0){
-        while(remainder >= 0)
-            remainder += n;
+    // 음수 처리
+    if(r < 0){
+        while(r >= 0)
+            r += n;
     }
 
-    while(remainder >= n){
-        remainder -= n;
-        quotient++;
+    while(r >= n){
+        r -= n;
+        q++;
     }
 
-    result = quotient;
+    result = q;
     result = result << 32;
-    result += remainder;
+    result += r;
 
     return result;
 }
+
 
 /*
  * @brief     모듈러 덧셈 연산을 하는 함수.
@@ -54,15 +58,15 @@ llint division(llint x, llint n){
  */
 llint ModAdd(llint a, llint b, byte op, llint n) {
     llint result;
-    llint x, y;
+    llint x = a, y = b;
 
-    x = getRemainder(division(a, n));
-    y = getRemainder(division(b, n));
+    // x = getRemainder(division(a, n));
+    // y = getRemainder(division(b, n));
 
     if(x == 0)
-        return y;
+        return getRemainder(division(b, n));
     if(y == 0)
-        return x;
+        return getRemainder(division(a, n));
     
     if(x + y <= x)
         result = getRemainder(division(x - (n - y), n));
@@ -71,7 +75,6 @@ llint ModAdd(llint a, llint b, byte op, llint n) {
 
     return result;
 }
-
 
 /*
  * @brief      모듈러 곱셈 연산을 하는 함수.
@@ -85,21 +88,20 @@ llint ModMul(llint x, llint y, llint n){
     llint result = 0;
     llint a = x, b = y;
 
-    a = getRemainder(division(a, n));
-    // b = getRemainder(b, n);
+    // a = getRemainder(division(a, n));
+    // b = getRemainder(division(b, n));
 
     if(a == 0 || b == 0)
         return 0;
     else if(a == 1)
         return getRemainder(division(b, n));
     else if(b == 1)
-        return a;
+        return getRemainder(division(a, n));
 
     while(b > 0){
         if(isODD(b)){
             result = ModAdd(result, a, '+', n);
         }
-        // a = ModAdd(a, a, '+', n);
         a = getRemainder(division((a << 1), n));
         b = getDividedbyTwo(b);
     }
@@ -120,12 +122,11 @@ llint ModPow(llint base, llint exp, llint n) {
     llint result = 1, tmp;
     llint x = base, y = exp;
 
-    if((x < 1) || (n < 1))
-        return 0;
+    // if((x < 1) || (n < 1))
+    //     return 0;
+
     if(y == 0)
         return 1;
-
-    // x = getRemainder(x, n);
 
     if(y == 1)
         return getRemainder(division(x, n));
@@ -149,12 +150,30 @@ llint ModPow(llint base, llint exp, llint n) {
  * @todo       Miller-Rabin 소수 판별법과 같은 확률적인 방법을 사용하여,
                이론적으로 4N(99.99%) 이상 되는 값을 선택하도록 한다. 
  */
+/*
+bool IsPrime(llint testNum, llint repeat) {
+    llint randNum;
+
+    while(repeat > 0) {
+        do {
+            randNum = getRemainder(division(WELLRNG512a()*1000000, 65535-46341)) + 46341;
+        }while(GCD(randNum, testNum) != 1);
+
+        if(ModPow(randNum, testNum-1, testNum) != 1)
+            return FALSE;
+        repeat--;
+    }
+    return TRUE;
+}
+*/
+
 bool IsPrime(llint testNum, llint repeat) {
     llint n = testNum;
     llint s = n - 1;
-    llint a, tmp;
+    llint a, tmp, epsilon;
 
-    a = (llint) (WELLRNG512a() * (s - 1)) + 1; // random integer
+    // a = getRemainder(division((WELLRNG512a() * RND_SIZE) + RND_MIN, RND_MIN));
+    a = getRemainder(division(WELLRNG512a() * 100000, RND_SIZE) + RND_MIN); // random integer
 
     while (!isODD(s)) {
         if (ModPow(a, s, n) == n - 1)
@@ -174,65 +193,29 @@ bool IsPrime(llint testNum, llint repeat) {
  * @return      llint result : 피연산자의 모듈러 역수 값.
  * @todo        확장 유클리드 알고리즘을 사용하여 작성하도록 한다.
  */
-/*
 llint ModInv(llint a, llint m) {
     llint result = 0;
-    llint q, r;
-    llint s = 0, x0=1, x1=0;
-    llint t = 0, y0=0, y1=1;
+    llint s0 = 1, s1 = 0, t0 = 0, t1 = 1, r0 = a, r1 = m;
+    llint q, r, s, t;
 
-    while(m > 0)
+    while(r1 > 0)
     {
-        q = getQuotient(division(a, m));
-        r = getRemainder(division(a, m));
+        q = getQuotient(division(r0, r1)); // quotient
+        r = getRemainder(division(r0, r1)); // remainder
 
-        // printf("a is %llu, m is %llu\n", a, m);
-        // printf("quotient : %llu, remainder : %llu\n", quotient, remainder);
+        s = s0 - (q * s1);
+        s0 = s1;
+        s1 = s;
 
-        s = x0 - (q * x1);
-        t = y0 - (q * y1);
+        t = t0 - (q * t1);
+        t0 = t1;
+        t1 = t;
 
-        x0 = x1; 
-        x1 = s;
-        y0 = y1;
-        y1 = t;
-
-        a = m;
-        m = r;
+        r0 = r1;
+        r1 = r;
     }
-    if(a == 1) 
-        result = y0;
-
-    return result;
-}
-*/
-
-llint ModInv(llint a, llint m) {
-    llint result;
-    llint t0 = 0, t1 = 1, s0 = 0, s1 = 1, r0 = a, r1 = m;
-    llint q, r, tmp;
-
-    while(r1 != 0){
-        q = getQuotient(division(r0, r1));
-        // r = getRemainder(division(r0, r1));
-
-        tmp = t1;
-        t1 = t0 - q * t1;
-        t0 = tmp;
-
-        tmp = r1;
-        r1 = r0 - q * r1;
-        r0 = tmp;
-    }
-
-    if(r0 > 1){ // not invertible
-        printf("not invertible\n");
-        exit(1);
-    }
-    if(t0 < 0)
-        t0 += n;
-    
-    result = t0;
+    if(r0 == 1) 
+        result = t0;
 
     return result;
 }
@@ -249,15 +232,20 @@ llint ModInv(llint a, llint m) {
  */
 void miniRSAKeygen(llint *p, llint *q, llint *e, llint *d, llint *n) {
     llint phi_n;
+    llint epsilon;
 
     do{
-        *p = getRemainder(division(WELLRNG512a() * 100000000000000000, (RND_MAX-RND_MIN)) + RND_MIN); // random prime
-    } while(IsPrime(*p, 5));
+        *p = (WELLRNG512a() * RND_SIZE) + RND_MIN;
+        // *p = getRemainder(division(WELLRNG512a() * 100000, RND_SIZE) + RND_MIN);
+    } while(!IsPrime(*p, 7));
 
+    printf("p is %llu, ", *p);
     do{
-        *q = getRemainder(division(WELLRNG512a() * 100000000000000000, (RND_MAX-RND_MIN)) + RND_MIN); // random prime
-    } while(IsPrime(*q, 5));
+        *q = (WELLRNG512a() * RND_SIZE) + RND_MIN;
+        // *q = getRemainder(division(WELLRNG512a() * 100000, RND_SIZE) + RND_MIN);
+    } while(!IsPrime(*q, 7));
 
+    printf("q is %llu\n", *q);
     // *p = 3;
     // *q = 7;
     // *e = 5;
@@ -268,10 +256,13 @@ void miniRSAKeygen(llint *p, llint *q, llint *e, llint *d, llint *n) {
     // e : <= phi_n and relatively prime with phi_n
     // compute d : e mod phi_n, ed mod phi_n = 1
     do{
-        *e = (llint) (WELLRNG512a() * 100000000000000000);
+        *e = (WELLRNG512a() * RND_SIZE) + RND_MIN;
+        // *e = WELLRNG512a() * 100000;
+        printf("phi_n is %llu, e is %llu\n", phi_n, *e);
         *d = ModInv(phi_n, *e);
-        printf("phi_n is %llu, e is %llu, d is %llu\n", phi_n, *e, *d);
+        printf("d is %llu\n", *d);
     } while(GCD(*e, phi_n) != 1 || phi_n <= *e || ModMul(*e, *d, phi_n) != 1);
+    printf("e is %llu, d is %llu\n", *e, *d);
 }
 
 /*
@@ -287,7 +278,6 @@ llint miniRSA(llint data, llint key, llint n) {
 
     printf("data : %llu, key : %llu, n : %llu\n", data, key, n);
     result = ModPow(data, key, n);
-    printf("data : %llu, key : %llu, n : %llu\n", data, key, n);
 
     return result;
 }
@@ -317,10 +307,9 @@ int main(int argc, char* argv[]) {
     seed = time(NULL);
     InitWELLRNG512a(&seed);
 
-    printf("22 + 31 mod 12 is 5, %llu\n", ModAdd(22, 31, '+', 12));
-    printf("8^2 mod 3 is 1, %llu\n", ModPow(8, 2, 3));
-    printf("11 * 2 mod 9 is 4, %llu\n", ModMul(11, 2, 9));
-    printf("7*x mod 160 is 23, %llu\n\n", ModInv(160, 7));
+    // printf("ModInv(7, 40) is 23, %llu\n", ModInv(7, 40)); // 3 why..?
+    // printf("IsPrime(524283, 7) is 1, %d\n\n", IsPrime(524283, 7)); // 524287 is prime
+    // printf("IsPrime(2147483647, 7) is 1, %d\n\n", IsPrime(2147483647, 7)); // 2147483647 is prime
 
     // RSA 키 생성
     miniRSAKeygen(&p, &q, &e, &d, &n);

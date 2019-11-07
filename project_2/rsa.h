@@ -43,8 +43,10 @@
 
 #define FACT	2.32830643653869628906e-10
 
-#define RND_MAX	0xffffffff
-#define RND_MIN	0x0fffffff
+#define RND_MAX	0xffffffff // 4294967295
+#define RND_MIN	0x0fffffff // 268435455
+// #define RND_MAX 0x00ffff
+// #define RND_MIN 0x00abcd
 #define FALSE	0
 #define TRUE	1
 
@@ -64,11 +66,12 @@ void InitWELLRNG512a(uint *init);
 double WELLRNG512a(void);
 
 // mini RSA 관련 인터페이스(구현해야 합니다.)
-llint modMul(llint x, llint y, llint mod);
-llint modPow(llint base, uint exp, llint mod);
-bool isPrime(llint n, llint repeat);
-llint gcd(llint a, llint b);
-llint modInv(llint a, llint m);
+llint ModAdd(llint x, llint y, byte op, llint mod);
+llint ModMul(llint x, llint y, llint mod);
+llint ModPow(llint base, llint exp, llint mod);
+bool IsPrime(llint n, llint repeat);
+llint GCD(llint a, llint b);
+llint ModInv(llint a, llint m);
 void miniRSAKeygen(llint *p, llint *q, llint *e, llint *d, llint *n);
 llint miniRSA(llint data, llint key, llint n);
 
